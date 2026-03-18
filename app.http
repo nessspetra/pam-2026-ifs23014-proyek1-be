@@ -1,0 +1,161 @@
+## Global Variabel
+@BaseUrl = http://127.0.0.1:8000
+# @BaseUrl = https://pam-2026-p5-ifs18005-be.delcom.org:8080
+
+### ---------------------------------------
+## Auth
+### ---------------------------------------
+
+### Melakukan pendaftaran
+# @name PostRegister
+POST {{BaseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Gayus Petra",
+  "username": "gayus123",
+  "password": "password123"
+}
+
+### Masuk ke layanan
+# @name PostLogin
+POST {{BaseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "gayus123",
+  "password": "password123"
+}
+
+> {%
+    client.global.set("authToken", response.body.data.authToken);
+    client.global.set("refreshToken", response.body.data.refreshToken);
+%}
+
+### Refresh Token
+# @name PostRefreshToken
+POST {{BaseUrl}}/auth/refresh-token
+Content-Type: application/json
+
+{
+  "authToken": "{{authToken}}",
+  "refreshToken": "{{refreshToken}}"
+}
+
+> {%
+    client.global.set("authToken", response.body.data.authToken);
+    client.global.set("refreshToken", response.body.data.refreshToken);
+%}
+
+### Keluar dari layanan
+# @name PostLogout
+POST {{BaseUrl}}/auth/logout
+Content-Type: application/json
+
+{
+  "authToken": "{{authToken}}"
+}
+
+### ---------------------------------------
+## Users (Profil - Requirement No 4)
+### ---------------------------------------
+
+### Mengambil informasi akun saya
+# @name GetUserMe
+GET {{BaseUrl}}/users/me
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+> {%
+    client.global.set("userId", response.body.data.user.id);
+%}
+
+### Mengubah informasi akun
+# @name PutUserMe
+PUT {{BaseUrl}}/users/me
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Gayus Jones Petra",
+  "username": "gayus123"
+}
+
+### Mengubah kata sandi akun
+# @name PutUserMePassword
+PUT {{BaseUrl}}/users/me/password
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "password": "password123",
+  "newPassword": "newpassword123"
+}
+
+### Mengubah foto profil
+# @name PutUserMePhoto
+PUT {{BaseUrl}}/users/me/photo
+Authorization: Bearer {{authToken}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="profile.png"
+Content-Type: image/png
+
+< ./uploads/examples/me.png
+--WebAppBoundary--
+
+### ---------------------------------------
+## Items (Lost & Found - Requirement No 1 & 5)
+### ---------------------------------------
+
+### Mengambil semua data barang (Search, Filter, Paging)
+# @name GetItems
+GET {{BaseUrl}}/items?search=&type=LOST&category=Elektronik&limit=10&offset=0
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+### Menambahkan laporan barang (LOST/FOUND)
+# @name PostItems
+POST {{BaseUrl}}/items
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "title": "Kunci Motor Honda",
+  "description": "Hilang di parkiran depan gedung perkuliahan",
+  "itemType": "LOST",
+  "category": "Lain-lain",
+  "location": "Parkiran Gedung 9",
+  "status": "OPEN",
+  "eventDate": "2026-03-18T14:00:00Z"
+}
+
+> {%
+    client.global.set("itemId", response.body.data.itemId);
+%}
+
+### Mengambil detail barang berdasarkan id
+# @name GetItemById
+GET {{BaseUrl}}/items/{{itemId}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+### Mengunggah gambar barang
+# @name PutItemImage
+PUT {{BaseUrl}}/items/{{itemId}}/image
+Authorization: Bearer {{authToken}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="item.png"
+Content-Type: image/png
+
+< ./uploads/examples/item.png
+--WebAppBoundary--
+
+### Menghapus laporan barang
+# @name DeleteItem
+DELETE {{BaseUrl}}/items/{{itemId}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
