@@ -26,7 +26,7 @@ object ItemTable : UUIDTable("items") {
     val status = varchar("status", 15).default("OPEN")
 
     // Gambar barang (Menggantikan cover)
-    val image = text("image").nullable()
+    val image = text("image_url").nullable()
 
     // Tanggal Kejadian (Bisa digunakan untuk pengurutan/sorting)
     val eventDate = timestamp("event_date")
