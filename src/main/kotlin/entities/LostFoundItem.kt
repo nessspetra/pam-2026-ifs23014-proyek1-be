@@ -7,19 +7,17 @@ import kotlinx.serialization.Serializable
 import java.util.UUID
 
 @Serializable
-data class Item(
-    var id: String = UUID.randomUUID().toString(),
-    var userId: String,
+data class LostFoundItem(
+    var id : String = UUID.randomUUID().toString(),
+    var userId : String,
+    val type: String,
     var title: String,
     var description: String,
-    var itemType: String,
-    var category: String,
-    var location: String,
-    var status: String = "OPEN",
-    var image: String?,
-    var urlImage: String = "",
-    @Contextual
-    var eventDate: Instant = Clock.System.now(),
+    val category: String,
+    val location: String,
+    val imageUrl: String? = null,
+    val status: String = "ACTIVE", // "ACTIVE", "RESOLVED", "EXPIRED"
+    val date: String,
 
     @Contextual
     val createdAt: Instant = Clock.System.now(),

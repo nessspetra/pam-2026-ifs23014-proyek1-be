@@ -2,43 +2,38 @@ package org.delcom.module
 
 import org.delcom.repositories.*
 import org.delcom.services.AuthService
-import org.delcom.services.ItemService
+import org.delcom.services.LostFoundItemService
 import org.delcom.services.UserService
 import org.koin.dsl.module
-import io.ktor.server.application.*
 
-fun appModule(application: Application) = module {
-    // Ambil konfigurasi dari application.conf
-    val baseUrl = application.environment.config
-        .property("ktor.app.baseUrl")
-        .getString()
-        .trimEnd('/')
-
-    val jwtSecret = application.environment.config
-        .property("ktor.jwt.secret")
-        .getString()
-
-    // 1. User Management
+fun appModule(jwtSecret: String) = module {
+    // User Repository
     single<IUserRepository> {
-        UserRepository(baseUrl)
-    }
-    single {
-        UserService(get(), get())
+        UserRepository()
     }
 
-    // 2. Token Management (Auth)
+    // User Service
+    single {
+        UserService(get(),get())
+    }
+
+    // Refresh Token Repository
     single<IRefreshTokenRepository> {
         RefreshTokenRepository()
     }
+
+    // Auth Service
     single {
-        AuthService(jwtSecret, get(), get())
+        AuthService(jwtSecret,get(), get())
     }
 
-    // 3. Item Management (Lost & Found - Requirement No 5)
-    single<IItemRepository> {
-        ItemRepository(baseUrl)
+    // Plant Repository
+    single<ILostFoundItemRepository> {
+        LostFoundItemRepository()
     }
+
+    // Plant Service
     single {
-        ItemService(get(), get())
+        LostFoundItemService(get(),get())
     }
 }

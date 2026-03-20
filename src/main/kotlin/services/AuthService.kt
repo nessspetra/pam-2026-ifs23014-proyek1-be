@@ -23,57 +23,70 @@ class AuthService(
     private val userRepository: IUserRepository,
     private val refreshTokenRepository: IRefreshTokenRepository,
 ) {
-    // Register (Requirement No 1: Autentikasi)
+    // register
     suspend fun postRegister(call: ApplicationCall) {
+        // Ambil data request
         val request = call.receive<AuthRequest>()
 
+        // Validasi request
         val validator = ValidatorHelper(request.toMap())
         validator.required("name", "Nama tidak boleh kosong")
         validator.required("username", "Username tidak boleh kosong")
         validator.required("password", "Password tidak boleh kosong")
         validator.validate()
 
-        // Periksa apakah username sudah dipakai (karena kita pakai uniqueIndex di UserTable)
+        // periksa user dengan username
         val existUser = userRepository.getByUsername(request.username)
         if (existUser != null) {
-            throw AppException(409, "Akun dengan username ini sudah terdaftar!")
+            throw AppException(
+                409,
+                "Akun dengan username ini sudah terdaftar!"
+            )
         }
 
-        // Hash password sebelum disimpan ke database
         request.password = hashPassword(request.password)
         val userId = userRepository.create(request.toEntity())
 
         val response = DataResponse(
             "success",
             "Berhasil melakukan pendaftaran",
-            mapOf("userId" to userId)
+            mapOf(Pair("userId", userId))
         )
         call.respond(response)
     }
 
-    // Login (Requirement No 1: Autentikasi)
+    // Login
     suspend fun postLogin(call: ApplicationCall) {
+        // Ambil data request
         val request = call.receive<AuthRequest>()
 
+        // Validasi request
         val validator = ValidatorHelper(request.toMap())
         validator.required("username", "Username tidak boleh kosong")
         validator.required("password", "Password tidak boleh kosong")
         validator.validate()
 
-        val existUser = userRepository.getByUsername(request.username)
-            ?: throw AppException(404, "Username atau Password salah!")
+        // periksa user dengan username
+        val existUser = userRepository.getByUsername(request.username) ?: throw AppException(
+            404,
+            "Kredensial yang digunakan tidak valid!"
+        )
 
-        if (!verifyPassword(request.password, existUser.password)) {
-            throw AppException(404, "Username atau Password salah!")
+        val validPassword = verifyPassword(request.password, existUser.password)
+        if (!validPassword) {
+            throw AppException(404, "Kredensial yang digunakan tidak valid!")
         }
 
-        // Generate JWT Token (Berlaku 1 Jam)
-        val authToken = generateToken(existUser.id)
+        val authToken = JWT.create()
+            .withAudience(JWTConstants.AUDIENCE)
+            .withIssuer(JWTConstants.ISSUER)
+            .withClaim("userId", existUser.id)
+            .withExpiresAt(Date(System.currentTimeMillis() + 60 * 60 * 1000)) // 1 Jam
+            .sign(Algorithm.HMAC256(jwtSecret))
 
-        // Hapus token lama untuk keamanan
+        // Hapus semua token lama
         refreshTokenRepository.deleteByUserId(existUser.id)
 
-        // Buat refresh token baru
         val strRefreshToken = UUID.randomUUID().toString()
         refreshTokenRepository.create(
             RefreshToken(
@@ -83,90 +96,102 @@ class AuthService(
             )
         )
 
-        call.respond(DataResponse(
+        val response = DataResponse(
             "success",
             "Berhasil melakukan login",
             mapOf(
-                "authToken" to authToken,
-                "refreshToken" to strRefreshToken
+                Pair("authToken", authToken),
+                Pair("refreshToken", strRefreshToken)
             )
-        ))
+        )
+        call.respond(response)
     }
 
-    // Refresh Token (Requirement No 3: Persistensi Login dengan DataStore)
+    // Refresh Token
     suspend fun postRefreshToken(call: ApplicationCall) {
+        // Ambil data request
         val request = call.receive<RefreshTokenRequest>()
 
+        // Validasi request
         val validator = ValidatorHelper(request.toMap())
         validator.required("refreshToken", "Refresh Token tidak boleh kosong")
         validator.required("authToken", "Auth Token tidak boleh kosong")
         validator.validate()
 
+        // Periksa refresh token
         val existRefreshToken = refreshTokenRepository.getByToken(
             refreshToken = request.refreshToken,
             authToken = request.authToken
         )
 
-        // Selalu hapus token lama (Rotation Token Policy)
+        // Hapus token lama
         refreshTokenRepository.delete(request.authToken)
 
-        if (existRefreshToken == null) {
-            throw AppException(401, "Sesi berakhir, silakan login kembali.")
+        if(existRefreshToken == null) {
+            throw AppException(401, "Token tidak valid!")
         }
 
-        val user = userRepository.getById(existRefreshToken.userId)
-            ?: throw AppException(404, "User tidak ditemukan.")
+        // periksa user
+        val userId = existRefreshToken.userId
+        val user = userRepository.getById(userId)
+        if(user == null){
+            throw AppException(404, "User tidak valid!")
+        }
 
-        val newAuthToken = generateToken(user.id)
-        val newRefreshToken = UUID.randomUUID().toString()
+        val authToken = JWT.create()
+            .withAudience(JWTConstants.AUDIENCE)
+            .withIssuer(JWTConstants.ISSUER)
+            .withClaim("userId", userId)
+            .withExpiresAt(Date(System.currentTimeMillis() + 60 * 60 * 1000)) // 1 Jam
+            .sign(Algorithm.HMAC256(jwtSecret))
 
+        val strRefreshToken = UUID.randomUUID().toString()
         refreshTokenRepository.create(
             RefreshToken(
                 userId = user.id,
-                authToken = newAuthToken,
-                refreshToken = newRefreshToken
+                authToken = authToken,
+                refreshToken = strRefreshToken
             )
         )
 
-        call.respond(DataResponse(
+        val response = DataResponse(
             "success",
             "Berhasil melakukan refresh token",
             mapOf(
-                "authToken" to newAuthToken,
-                "refreshToken" to newRefreshToken
+                Pair("authToken", authToken),
+                Pair("refreshToken", strRefreshToken)
             )
-        ))
+        )
+        call.respond(response)
     }
 
     // Logout
     suspend fun postLogout(call: ApplicationCall) {
+        // Ambil data request
         val request = call.receive<RefreshTokenRequest>()
 
+        // Validasi request
         val validator = ValidatorHelper(request.toMap())
         validator.required("authToken", "Auth Token tidak boleh kosong")
         validator.validate()
 
-        try {
-            val decodedJWT = JWT.require(Algorithm.HMAC256(jwtSecret)).build().verify(request.authToken)
-            val userId = decodedJWT.getClaim("userId").asString()
+        val decodedJWT = JWT.require(Algorithm.HMAC256(jwtSecret))
+            .build()
+            .verify(request.authToken)
 
-            refreshTokenRepository.delete(request.authToken)
-            if (userId != null) refreshTokenRepository.deleteByUserId(userId)
-        } catch (e: Exception) {
-            // Jika token sudah expired, tetap hapus dari repository jika ada
-            refreshTokenRepository.delete(request.authToken)
-        }
+        val userId = decodedJWT
+            .getClaim("userId")
+            .asString() ?: throw AppException(401, "Token tidak valid")
 
-        call.respond(DataResponse("success", "Berhasil logout", null))
-    }
+        // hapus semya token lama
+        refreshTokenRepository.delete(request.authToken)
+        refreshTokenRepository.deleteByUserId(userId)
 
-    // Helper untuk generate JWT agar kode tidak berulang (DRY)
-    private fun generateToken(userId: String): String {
-        return JWT.create()
-            .withAudience(JWTConstants.AUDIENCE)
-            .withIssuer(JWTConstants.ISSUER)
-            .withClaim("userId", userId)
-            .withExpiresAt(Date(System.currentTimeMillis() + 3600000)) // 1 Jam
-            .sign(Algorithm.HMAC256(jwtSecret))
+        val response = DataResponse(
+            "success",
+            "Berhasil logout",
+            null,
+        )
+        call.respond(response)
     }
 }

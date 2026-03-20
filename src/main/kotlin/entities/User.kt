@@ -8,16 +8,11 @@ import java.util.UUID
 
 @Serializable
 data class User(
-    var id: String = UUID.randomUUID().toString(),
+    var id : String = UUID.randomUUID().toString(),
     var name: String,
-    var username: String, // Pastikan di logic service nanti ini unik
+    var username: String,
     var password: String,
-
-    // Path relatif file di server (misal: "uploads/user1.jpg")
     var photo: String? = null,
-
-    // URL publik lengkap (misal: "https://api.delcom.org/static/user1.jpg")
-    var urlPhoto: String = "",
 
     @Contextual
     val createdAt: Instant = Clock.System.now(),

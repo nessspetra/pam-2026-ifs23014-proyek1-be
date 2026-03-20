@@ -1,6 +1,6 @@
 ## Global Variabel
-@BaseUrl = https://pam-2026-ifs23014-proyek1-be.nessspetra.fun:8080
-# @BaseUrl = https://pam-2026-ifs23014-proyek1-be.nessspetra.fun:8080
+#@BaseUrl = https://your-production-url.com:8080
+@BaseUrl = http://127.0.0.1:8000
 
 ### ---------------------------------------
 ## Auth

@@ -8,11 +8,6 @@ import org.delcom.entities.User
 import org.delcom.repositories.IUserRepository
 
 object ServiceHelper {
-    /**
-     * Mengambil data user yang sedang login berdasarkan JWT Token.
-     * Digunakan untuk memastikan setiap laporan barang (Lost/Found)
-     * terikat dengan user yang benar.
-     */
     suspend fun getAuthUser(call: ApplicationCall, userRepository: IUserRepository): User {
         val principal = call.principal<JWTPrincipal>()
             ?: throw AppException(401, "Unauthorized")

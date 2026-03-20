@@ -1,3 +1,4 @@
+
 package org.delcom
 
 import io.ktor.http.HttpStatusCode
@@ -10,18 +11,17 @@ import org.delcom.data.AppException
 import org.delcom.data.ErrorResponse
 import org.delcom.helpers.JWTConstants
 import org.delcom.helpers.parseMessageToMap
-import org.delcom.services.ItemService
+import org.delcom.services.LostFoundItemService
 import org.delcom.services.AuthService
 import org.delcom.services.UserService
 import org.koin.ktor.ext.inject
 
 fun Application.configureRouting() {
-    val itemService: ItemService by inject()
+    val lostFoundItemService: LostFoundItemService by inject()
     val authService: AuthService by inject()
     val userService: UserService by inject()
 
     install(StatusPages) {
-        // Tangkap AppException untuk validasi dan error bisnis
         exception<AppException> { call, cause ->
             val dataMap: Map<String, List<String>> = parseMessageToMap(cause.message)
 
@@ -35,13 +35,12 @@ fun Application.configureRouting() {
             )
         }
 
-        // Tangkap error sistem (500)
         exception<Throwable> { call, cause ->
             call.respond(
-                status = HttpStatusCode.InternalServerError,
+                status = HttpStatusCode.fromValue(500),
                 message = ErrorResponse(
                     status = "error",
-                    message = cause.message ?: "Terjadi kesalahan pada server",
+                    message = cause.message ?: "Unknown error",
                     data = ""
                 )
             )
@@ -50,43 +49,73 @@ fun Application.configureRouting() {
 
     routing {
         get("/") {
-            call.respondText("Delcom Lost & Found API telah berjalan.")
+            call.respondText("Lost & Found API telah berjalan.")
         }
 
-        // Route Auth (Publik)
+        // Route Auth
         route("/auth") {
-            post("/login") { authService.postLogin(call) }
-            post("/register") { authService.postRegister(call) }
-            post("/refresh-token") { authService.postRefreshToken(call) }
-            post("/logout") { authService.postLogout(call) }
+            post("/login") {
+                authService.postLogin(call)
+            }
+            post("/register") {
+                authService.postRegister(call)
+            }
+            post("/refresh-token") {
+                authService.postRefreshToken(call)
+            }
+            post("/logout") {
+                authService.postLogout(call)
+            }
         }
 
-        // Route yang membutuhkan Token JWT
         authenticate(JWTConstants.NAME) {
-
-            // Route User (Profil - Requirement No 4)
+            // Route Users
             route("/users") {
-                get("/me") { userService.getMe(call) }
-                put("/me") { userService.putMe(call) }
-                put("/me/password") { userService.putMyPassword(call) }
-                put("/me/photo") { userService.putMyPhoto(call) }
+                get("/me") {
+                    userService.getMe(call)
+                }
+                put("/me") {
+                    userService.putMe(call)
+                }
+                put("/me/password") {
+                    userService.putMyPassword(call)
+                }
+                put("/me/photo") {
+                    userService.putMyPhoto(call)
+                }
             }
 
-            // Route Items (Lost & Found - Requirement No 1 & 5)
+            // Route Lost & Found Items
             route("/items") {
-                get { itemService.getAll(call) } // Mendukung Search, Filter, & Paging
-                post { itemService.post(call) }
-                get("/{id}") { itemService.getById(call) }
-                put("/{id}") { userService.putMe(call) } // Bisa disesuaikan untuk update item
-                put("/{id}/image") { itemService.putImage(call) }
-                delete("/{id}") { itemService.delete(call) }
+                get {
+                    lostFoundItemService.getAll(call)
+                }
+                post {
+                    lostFoundItemService.post(call)
+                }
+                get("/{id}") {
+                    lostFoundItemService.getById(call)
+                }
+                put("/{id}") {
+                    lostFoundItemService.put(call)
+                }
+                put("/{id}/image") {
+                    lostFoundItemService.putImage(call)
+                }
+                delete("/{id}") {
+                    lostFoundItemService.delete(call)
+                }
             }
         }
 
-        // Route untuk akses gambar (Fallback jika tidak menggunakan Static Files Helper)
+        // Route Images
         route("/images") {
-            get("users/{id}") { userService.getPhoto(call) }
-            get("items/{id}") { itemService.getById(call) } // Menampilkan detail via ID
+            get("/users/{id}") {
+                userService.getPhoto(call)
+            }
+            get("/items/{id}") {
+                lostFoundItemService.getImage(call)
+            }
         }
     }
 }
