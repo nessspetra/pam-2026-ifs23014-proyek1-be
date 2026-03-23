@@ -9,6 +9,9 @@ import io.ktor.util.cio.*
 import io.ktor.utils.io.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import kotlinx.serialization.Serializable
 import org.delcom.data.AppException
 import org.delcom.data.AuthRequest
 import org.delcom.data.DataResponse
@@ -38,6 +41,7 @@ class  UserService(
                     id = user.id,
                     name = user.name,
                     username = user.username,
+                    photo = user.photo,
                     createdAt = user.createdAt,
                     updatedAt = user.updatedAt,
                 ),
